@@ -2,13 +2,16 @@ package com.mpaas.demo.share;
 
 import android.os.Bundle;
 import android.support.v7.widget.MenuPopupWindow;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.Toast;
 
 import com.alipay.android.shareassist.constants.ShareExtraInfoConstant;
 import com.alipay.mobile.antui.basic.AUButton;
 import com.alipay.mobile.antui.basic.AUTitleBar;
 import com.alipay.mobile.antui.dialog.AUListDialog;
+import com.alipay.mobile.antui.dialog.AUProgressDialog;
 import com.alipay.mobile.common.share.ShareContent;
 import com.alipay.mobile.common.share.constant.ShareType;
 import com.alipay.mobile.framework.app.ui.BaseActivity;
@@ -20,13 +23,16 @@ import com.mpaas.framework.adapter.api.MPFramework;
 import com.mpaas.demo.sharedemo.R;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 public class ShareActivity extends BaseActivity {
-    private AUButton mShareBtn;
+
+    public static final String TAG = ShareActivity.class.getSimpleName();
+    private int type=0;//0 url, 1 text, 2 image
     private AUButton mGetInstructionsBtn;
     private AUListDialog mShareDialog;
 
@@ -40,6 +46,7 @@ public class ShareActivity extends BaseActivity {
     private byte[] mWechatDefaultIconBytes;
 
     private AUTitleBar mTitle;
+    private AUProgressDialog progressDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +58,7 @@ public class ShareActivity extends BaseActivity {
         initWechatDefaultIcon();
         findView();
         initView();
+        progressDialog = new AUProgressDialog(this);
     }
 
     /**
@@ -102,7 +110,6 @@ public class ShareActivity extends BaseActivity {
 
     private void findView() {
         mTitle = ((AUTitleBar) findViewById(R.id.title_atb));
-        mShareBtn = (AUButton) findViewById(R.id.share_share_btn);
         mGetInstructionsBtn = (AUButton) findViewById(R.id.share_get_instructions_btn);
         mShareDialog = new AUListDialog(this, mData);
     }
@@ -117,9 +124,31 @@ public class ShareActivity extends BaseActivity {
 //                popupWindow.showAsDropDown(mTitle.getRightButtonIconView(), 0, 0);
             }
         });
-        mShareBtn.setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.share_url_btn).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                type=0;
+                mShareDialog.show();
+            }
+        });
+        findViewById(R.id.share_text_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                type=1;
+                mShareDialog.show();
+            }
+        });
+        findViewById(R.id.share_image_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                type=2;
+                mShareDialog.show();
+            }
+        });
+        findViewById(R.id.share_big_image_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                type=3;
                 mShareDialog.show();
             }
         });
@@ -137,39 +166,50 @@ public class ShareActivity extends BaseActivity {
         mShareDialog.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                String shareMsg = mData.get(i);
-                if (getString(R.string.alipay).equals(shareMsg)) {
-                    shareToAlipay();
-                    return;
-                }
-                if (getString(R.string.wechat).equals(shareMsg)) {
-                    shareToWechat();
-                    return;
-                }
-                if (getString(R.string.wechat_timeline).equals(shareMsg)) {
-                    shareToWechatTimeline();
-                    return;
-                }
-                if (getString(R.string.weibo).equals(shareMsg)) {
-                    shareToWeibo();
-                    return;
-                }
-                if (getString(R.string.qq).equals(shareMsg)) {
-                    shareToQQ();
-                    return;
-                }
-                if (getString(R.string.qzone).equals(shareMsg)) {
-                    shareToQZone();
-                    return;
-                }
-                if (getString(R.string.dingding).equals(shareMsg)) {
-                    shareToDingDing();
-                    return;
-                }
-                if (getString(R.string.sms).equals(shareMsg)) {
-                    shareToSms();
-                    return;
-                }
+                final String shareMsg = mData.get(i);
+
+                progressDialog.setProgressVisiable(true);
+                progressDialog.setMessage("等待中...");
+                progressDialog.show();
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        if (getString(R.string.alipay).equals(shareMsg)) {
+                            shareToAlipay();
+                            return;
+                        }
+                        if (getString(R.string.wechat).equals(shareMsg)) {
+                            shareToWechat();
+                            return;
+                        }
+                        if (getString(R.string.wechat_timeline).equals(shareMsg)) {
+                            shareToWechatTimeline();
+                            return;
+                        }
+                        if (getString(R.string.weibo).equals(shareMsg)) {
+                            shareToWeibo();
+                            return;
+                        }
+                        if (getString(R.string.qq).equals(shareMsg)) {
+                            shareToQQ();
+                            return;
+                        }
+                        if (getString(R.string.qzone).equals(shareMsg)) {
+                            shareToQZone();
+                            return;
+                        }
+                        if (getString(R.string.dingding).equals(shareMsg)) {
+                            shareToDingDing();
+                            return;
+                        }
+                        if (getString(R.string.sms).equals(shareMsg)) {
+                            shareToSms();
+                            return;
+                        }
+                    }
+                }).start();
+
             }
         });
     }
@@ -181,7 +221,7 @@ public class ShareActivity extends BaseActivity {
         service.initAlipayContact("2016111102737103");
         ShareContent content = createShareContent();
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_ALIPAY, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_ALIPAY, "test");
     }
 
     /**
@@ -192,7 +232,7 @@ public class ShareActivity extends BaseActivity {
         ShareContent content = createShareContent();
         setWechatDefaultIcon(content);
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_WEIXIN, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_WEIXIN, "test");
     }
 
     /**
@@ -203,7 +243,7 @@ public class ShareActivity extends BaseActivity {
         ShareContent content = createShareContent();
         setWechatDefaultIcon(content);
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_WEIXIN_TIMELINE, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_WEIXIN_TIMELINE, "test");
     }
 
     /**
@@ -213,7 +253,7 @@ public class ShareActivity extends BaseActivity {
         service.initWeiBo("1095133729", "eba90f2ef316f8106fd8b6507b44fcb5", "http://alipay.com");
         ShareContent content = createShareContent();
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_WEIBO, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_WEIBO, "test");
     }
 
     /**
@@ -223,7 +263,7 @@ public class ShareActivity extends BaseActivity {
         service.initQQ("1104122330");
         ShareContent content = createShareContent();
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_QQ, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_QQ, "test");
     }
 
     /**
@@ -233,7 +273,7 @@ public class ShareActivity extends BaseActivity {
         service.initQZone("1104122330");
         ShareContent content = createShareContent();
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_QZONE, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_QZONE, "test");
     }
 
     /**
@@ -243,7 +283,7 @@ public class ShareActivity extends BaseActivity {
         service.initDingDing("dingoa7rxo7sxowhwpg5ke");
         ShareContent content = createShareContent();
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_DINGDING, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_DINGDING, "test");
     }
 
 
@@ -253,7 +293,7 @@ public class ShareActivity extends BaseActivity {
     private void shareToSms() {
         ShareContent content = createShareContent();
         service.setShareActionListener(mShareListener);
-        service.silentShare(content, ShareType.SHARE_TYPE_SMS, "test");
+        ShareHelper.share(service, content, ShareType.SHARE_TYPE_SMS, "test");
     }
 
     /**
@@ -262,21 +302,54 @@ public class ShareActivity extends BaseActivity {
      * @return 分享内容
      */
     private ShareContent createShareContent() {
-        final ShareContent content = new ShareContent();
-        // 设置分享内容
-        content.setContent("mPaaS share content");
-        // 设置分享类型，分享链接请选择"url"
-        content.setContentType("url");
-        // 设置分享标题
-        content.setTitle("mPaaS share title");
-        // 设置分享图片地址，微信分享请保证图片小于32KB
-        content.setImgUrl("https://gw.alipayobjects.com/zos/rmsportal/WqYuuhbhRSCdtsyNOKPv.png");
-        // 此image url为一张超过32KB的大图，用于测试微信分享超过32KB时，默认icon的功能
-//        content.setImgUrl("http://seopic.699pic.com/photo/00026/7248.jpg_wh1200.jpg");
-        // 设置分享链接
-        content.setUrl("https://www.cloud.alipay.com/products/MPAAS");
-        // QZone分享会默认屏蔽alipay.com的域名，测试QZone时，请注释掉上面代码，改为百度首页即可。
-//        content.setUrl("https://www.baidu.com");
+        Log.i(TAG, "createShareContent() called type ="+type);
+        ShareContent content = null;
+        if (type==0) {//url
+
+            content = ShareHelper.createUrlShareContent("mPaaS share title", "mPaaS share content",
+                    "https://www.baidu.com",
+                    "https://gw.alipayobjects.com/zos/rmsportal/WqYuuhbhRSCdtsyNOKPv.png");
+
+        } else if (type==1) {//text
+            content = ShareHelper.createTextShareContent("hello-text");
+
+        }  else if (type==2) {//image
+
+//            content = ShareHelper.createImageShareContent("https://gw.alipayobjects.com/zos/rmsportal/WqYuuhbhRSCdtsyNOKPv.png");//成功  小图
+            content = ShareHelper.createImageShareContent("https://desk-fd.zol-img.com.cn/t_s1920x1200c5/g5/M00/02/09/ChMkJ1bKzpKIW2RfAAY9MGwSXMYAALJMQAgrXAABj1I606.jpg");//失败 超过32k 以默认图代替
+//            content = ShareHelper.createImageShareContent("https://desk-fd.zol-img.com.cn/t_s960x600c5/g6/M00/04/08/ChMkKV8iKBiIZt0oACm2vPiaZH8AAAR-wPFpGkAKbbU155.jpg");//失败 超过32k 以默认图代替
+
+//            content = new ShareContent();
+//            content.setContentType("image");
+//            File file = new File("/data/data/com.mpaas.demo/files/123.png");
+//            if (!file.exists()) {
+//                Log.e(TAG, "文件不存在");
+//                return null;
+//            }
+//            content.setLocalImageUrl("/data/data/com.mpaas.demo/files/123.png");
+//            content.setLocalImageUrl(getFileStreamPath("123.png").getAbsolutePath());
+
+        }else {
+            try {
+                Thread.sleep(1000L);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                InputStream inputStream = getResources().getAssets().open("share/big_pic.jpg");//成功  传大图
+                content = ShareHelper.createImageShareContent(inputStream);
+                } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+//            content.setLocalImageUrl("file:///android_asset/share/big_pic.jpg");//失败
+//            content.setLocalImageUrl("file:///android_asset/share/appicon.png");//失败
+
+            // TODO: 2020/7/31 localImage  sdcard
+        }
+
+        progressDialog.dismiss();
         return content;
     }
 
