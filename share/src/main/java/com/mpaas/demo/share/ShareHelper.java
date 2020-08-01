@@ -5,13 +5,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
 
-import com.alipay.android.shareassist.utils.CallBackUtils;
-import com.alipay.mobile.antui.basic.AUToast;
 import com.alipay.mobile.common.share.ShareContent;
 import com.alipay.mobile.common.share.ShareException;
 import com.alipay.mobile.common.share.constant.ShareType;
@@ -24,6 +19,13 @@ import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+
+/**
+ * 社交分享帮助类
+ *
+ * @author: dongwen.wang
+ * @date:  2020/8/1 12:28
+ */
 public class ShareHelper {
 
     public static final String TAG = ShareHelper.class.getSimpleName();
@@ -73,56 +75,13 @@ public class ShareHelper {
         return content;
     }
 
-
     public static void share(final ShareService service, final ShareContent content, int shareType, final String biz) {
-        if (isImageContent(content)) {
+        if (!isSupportType(service, content, shareType)) {
+            return;
+        }
 
-            final CountDownLatch countDownLatch = new CountDownLatch(1);
-
-            ((ImageLoaderService) service.getMicroApplicationContext().findServiceByInterface(ImageLoaderService.class.getName())).startLoad("BANK_ICON", (String) null, content.getImgUrl(), new ImageLoaderListener() {
-                public final void onPostLoad(String arg0, Bitmap bitmap) {
-                    if (bitmap != null) {
-                        int options = 100;
-                        int rowBytes = bitmap.getRowBytes() * bitmap.getHeight();
-                        int size = rowBytes;
-                        if (size > 2*1024*1024) {
-                            options = 65;
-                        } else if (size > 1024*1024) {
-                            options = 75;
-                        }
-                        ByteArrayOutputStream os = new ByteArrayOutputStream();
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, options, os);
-                        byte[] b2 = os.toByteArray();
-
-                        if (b2.length < 3*1024*1024) {
-                            content.setImage(os.toByteArray());
-                            content.setImgUrl(null);
-                        }
-                    }
-                    countDownLatch.countDown();
-                }
-
-                public final void onFailed(String arg0, int arg1, String arg2) {
-
-                    countDownLatch.countDown();
-                }
-
-                public final void onCancelled(String arg0) {
-                    countDownLatch.countDown();
-                }
-
-                public final void onPreLoad(String arg0) {
-                }
-
-                public final void onProgressUpdate(String arg0, double arg1) {
-                }
-            }, -1, -1);
-
-            try {
-                countDownLatch.await(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        if (isImageUrlContent(content)) {
+            downloadImageUrl(service, content);
         }
 
         Application application = service.getMicroApplicationContext().getApplicationContext();
@@ -148,32 +107,99 @@ public class ShareHelper {
                 break;
             case ShareType.SHARE_TYPE_QQ:
                 if (isTextContent(content)) {
-
                     shareTextToQQ(application, content);
-
 //                    CallBackUtils.a(ShareType.SHARE_TYPE_QQ);
                     return;
                 }
                 break;
             case ShareType.SHARE_TYPE_QZONE:
-                //com.alipay.android.shareassist.api.QZoneShare
-                //com.alipay.android.shareassist.ShareAssistApp
-                if (isTextContent(content)) {
-                    Log.e(TAG, "不支持分享--文字--到QZone");
-                    ShareService.ShareActionListener listener = service.getShareActionListener();
-                    if (listener  != null) {
-                        listener.onException(shareType, new ShareException("不支持分享文字到QQ空间"));
-                    }
-
-                    return;
-                } else if (isImageContent(content)) {
+                if (isImageContent(content)) {
                     shareType = ShareType.SHARE_TYPE_QQ;//转成分享到QQ，然后选择“空间”
                 }
-
                 break;
         }
 
         service.silentShare(content, shareType, biz);
+    }
+
+    private static boolean isSupportType(final ShareService service, final ShareContent content, final int shareType) {
+        String exceptionMsg = null;
+        switch (shareType) {
+            case ShareType.SHARE_TYPE_QZONE:
+                //com.alipay.android.shareassist.api.QZoneShare
+                //com.alipay.android.shareassist.ShareAssistApp
+                if (isTextContent(content)) {
+                    exceptionMsg = "不支持分享文字到QQ空间";
+                }
+                break;
+            case ShareType.SHARE_TYPE_ALIPAY:
+                if (isTextContent(content)) {
+                    exceptionMsg = "不支持分享文字到支付宝";
+                } else if (isTextContent(content)) {
+                    exceptionMsg = "不支持分享图片到支付宝";
+                }
+                break;
+        }
+
+        if (exceptionMsg != null) {
+            Log.e(TAG, "" + exceptionMsg);
+            ShareService.ShareActionListener listener = service.getShareActionListener();
+            if (listener != null) {
+                listener.onException(shareType, new ShareException(exceptionMsg));
+            }
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    private static void downloadImageUrl(ShareService service, final ShareContent content) {
+        final CountDownLatch countDownLatch = new CountDownLatch(1);
+
+        ((ImageLoaderService) service.getMicroApplicationContext().findServiceByInterface(ImageLoaderService.class.getName())).startLoad("BANK_ICON", (String) null, content.getImgUrl(), new ImageLoaderListener() {
+            public final void onPostLoad(String arg0, Bitmap bitmap) {
+                if (bitmap != null) {
+                    int options = 100;
+                    int rowBytes = bitmap.getRowBytes() * bitmap.getHeight();
+                    int size = rowBytes;
+                    if (size > 2*1024*1024) {
+                        options = 65;
+                    } else if (size > 1024*1024) {
+                        options = 75;
+                    }
+                    ByteArrayOutputStream os = new ByteArrayOutputStream();
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, options, os);
+                    byte[] b2 = os.toByteArray();
+
+                    if (b2.length < 3*1024*1024) {
+                        content.setImage(os.toByteArray());
+                        content.setImgUrl(null);
+                    }
+                }
+                countDownLatch.countDown();
+            }
+
+            public final void onFailed(String arg0, int arg1, String arg2) {
+
+                countDownLatch.countDown();
+            }
+
+            public final void onCancelled(String arg0) {
+                countDownLatch.countDown();
+            }
+
+            public final void onPreLoad(String arg0) {
+            }
+
+            public final void onProgressUpdate(String arg0, double arg1) {
+            }
+        }, -1, -1);
+
+        try {
+            countDownLatch.await(7, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -205,6 +231,10 @@ public class ShareHelper {
 
     private static boolean isImageContent(final ShareContent content) {
         return content.getContentType().contentEquals("image");
+    }
+
+    private static boolean isImageUrlContent(final ShareContent content) {
+        return content.getContentType().contentEquals("image") && content.getImgUrl() != null && content.getImgUrl().startsWith("http");
     }
 
     private static byte[] inputStreamToByte(InputStream is) {
