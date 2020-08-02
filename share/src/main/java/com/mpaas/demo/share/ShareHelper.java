@@ -5,19 +5,20 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Log;
 
 import com.alipay.mobile.common.share.ShareContent;
 import com.alipay.mobile.common.share.ShareException;
 import com.alipay.mobile.common.share.constant.ShareType;
 import com.alipay.mobile.framework.service.ShareService;
-import com.alipay.mobile.framework.service.common.ImageLoaderListener;
-import com.alipay.mobile.framework.service.common.ImageLoaderService;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 
 /**
@@ -81,7 +82,7 @@ public class ShareHelper {
         }
 
         if (isImageUrlContent(content)) {
-            downloadImageUrl(service, content);
+            downloadImageUrl(content);
         }
 
         Application application = service.getMicroApplicationContext().getApplicationContext();
@@ -153,52 +154,39 @@ public class ShareHelper {
         }
     }
 
-    private static void downloadImageUrl(ShareService service, final ShareContent content) {
-        final CountDownLatch countDownLatch = new CountDownLatch(1);
-
-        ((ImageLoaderService) service.getMicroApplicationContext().findServiceByInterface(ImageLoaderService.class.getName())).startLoad("BANK_ICON", (String) null, content.getImgUrl(), new ImageLoaderListener() {
-            public final void onPostLoad(String arg0, Bitmap bitmap) {
-                if (bitmap != null) {
-                    int options = 100;
-                    int rowBytes = bitmap.getRowBytes() * bitmap.getHeight();
-                    int size = rowBytes;
-                    if (size > 2*1024*1024) {
-                        options = 65;
-                    } else if (size > 1024*1024) {
-                        options = 75;
-                    }
-                    ByteArrayOutputStream os = new ByteArrayOutputStream();
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, options, os);
-                    byte[] b2 = os.toByteArray();
-
-                    if (b2.length < 3*1024*1024) {
-                        content.setImage(os.toByteArray());
-                        content.setImgUrl(null);
-                    }
-                }
-                countDownLatch.countDown();
-            }
-
-            public final void onFailed(String arg0, int arg1, String arg2) {
-
-                countDownLatch.countDown();
-            }
-
-            public final void onCancelled(String arg0) {
-                countDownLatch.countDown();
-            }
-
-            public final void onPreLoad(String arg0) {
-            }
-
-            public final void onProgressUpdate(String arg0, double arg1) {
-            }
-        }, -1, -1);
-
+    private static void downloadImageUrl(final ShareContent content) {
+        Bitmap bitmap = null;
         try {
-            countDownLatch.await(7, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
+            URL myFileUrl = new URL(content.getImgUrl());
+            HttpURLConnection conn;
+            conn = (HttpURLConnection) myFileUrl.openConnection();
+            conn.setDoInput(true);
+            conn.connect();
+            InputStream is = conn.getInputStream();
+            bitmap = BitmapFactory.decodeStream(is);
+        } catch (MalformedURLException e) {
             e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (bitmap != null) {
+            int options = 100;
+            int rowBytes = bitmap.getRowBytes() * bitmap.getHeight();
+            int size = rowBytes;
+            if (size > 2*1024*1024) {
+                options = 65;
+            } else if (size > 1024*1024) {
+                options = 75;
+            }
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, options, os);
+            byte[] b2 = os.toByteArray();
+
+            if (b2.length < 3*1024*1024) {
+                content.setImage(os.toByteArray());
+                content.setImgUrl(null);
+            }
         }
     }
 
@@ -237,6 +225,7 @@ public class ShareHelper {
         return content.getContentType().contentEquals("image") && content.getImgUrl() != null && content.getImgUrl().startsWith("http");
     }
 
+    // FIXME: 2020/8/1 压缩图片
     private static byte[] inputStreamToByte(InputStream is) {
         try {
             ByteArrayOutputStream bytestream = new ByteArrayOutputStream();
