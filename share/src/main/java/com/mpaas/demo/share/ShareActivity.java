@@ -337,7 +337,16 @@ public class ShareActivity extends BaseActivity {
             }
 
             try {
-                InputStream inputStream = getResources().getAssets().open("share/big_pic.jpg");//成功  传大图
+//                InputStream inputStream = getResources().getAssets().open("share/big_pic.jpg");//成功  传大图
+
+
+                /*
+                 * 5700*3917  8.4Mb大图
+                 * https://pixabay.com/photos/heritage-japan-castle-himeji-white-5430081/
+                 * https://pixabay.com/photos/water-nature-sky-lake-castle-5386820/
+                 * https://pixabay.com/get/53e4d6434a5aad14ead9837ac02e347a1622dfe05a577440722673d1.jpg?attachment=
+                 */
+                InputStream inputStream = getResources().getAssets().open("share/heritage.jpg");//成功  传超大图
                 content = ShareHelper.createImageShareContent(inputStream);
                 } catch (IOException e) {
                 e.printStackTrace();

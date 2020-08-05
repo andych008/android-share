@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
 
+import com.alibaba.fastjson.JSON;
 import com.alipay.mobile.common.share.ShareContent;
 import com.alipay.mobile.common.share.ShareException;
 import com.alipay.mobile.common.share.constant.ShareType;
@@ -228,18 +229,91 @@ public class ShareHelper {
     // FIXME: 2020/8/1 压缩图片
     private static byte[] inputStreamToByte(InputStream is) {
         try {
-            ByteArrayOutputStream bytestream = new ByteArrayOutputStream();
-            int ch;
-            while ((ch = is.read()) != -1) {
-                bytestream.write(ch);
-            }
-            byte bytes[] = bytestream.toByteArray();
-            bytestream.close();
+            Bitmap bitmap = decodeSampledBitmapFromStream(is, 800, 600);
+            byte[] bytes = Bitmap2Bytes(bitmap);
+//            ByteArrayOutputStream bytestream = new ByteArrayOutputStream();
+//            int ch;
+//            while ((ch = is.read()) != -1) {
+//                bytestream.write(ch);
+//            }
+//            byte bytes[] = bytestream.toByteArray();
+//            bytestream.close();
             return bytes;
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         return null;
+    }
+
+//    public static byte[] ss(Bitmap bitmap){
+//        int options = 100;
+//        int rowBytes = bitmap.getRowBytes() * bitmap.getHeight();
+//        int size = rowBytes;
+//        if (size > 2*1024*1024) {
+//            options = 65;
+//        } else if (size > 1024*1024) {
+//            options = 75;
+//        }
+//        ByteArrayOutputStream os = new ByteArrayOutputStream();
+//        bitmap.compress(Bitmap.CompressFormat.JPEG, options, os);
+//        byte[] b2 = os.toByteArray();
+//
+//        if (b2.length < 3*1024*1024) {
+//            content.setImage(os.toByteArray());
+//            content.setImgUrl(null);
+//        }
+//    }
+
+    public static byte[] Bitmap2Bytes(Bitmap bm) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bm.compress(Bitmap.CompressFormat.JPEG, 75, baos);
+        return baos.toByteArray();
+    }
+    public static int calculateInSampleSize(
+            BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // Raw height and width of image
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while ((halfHeight / inSampleSize) >= reqHeight
+                    && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
+    }
+
+    public static Bitmap decodeSampledBitmapFromStream(InputStream is,
+                                                         int reqWidth, int reqHeight) {
+
+        // First decode with inJustDecodeBounds=true to check dimensions
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeStream(is, null, options);
+
+        Log.i(TAG, "options = "+JSON.toJSONString(options));
+        Log.i(TAG, "options.outMimeType = "+options.outMimeType);
+
+        // Calculate inSampleSize
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+
+        // Decode bitmap with inSampleSize set
+        options.inJustDecodeBounds = false;
+        try {
+            is.reset();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return BitmapFactory.decodeStream(is, null, options);
     }
 }
